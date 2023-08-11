@@ -1,54 +1,71 @@
-# import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO
+import adxl345
 import time
 import multiprocessing
-import classes.dht11 as dht11
 
 
-## comf temp 23 - 26
-## moisture 30% - 50%
+LED_MATRIX = [
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, 8 ,9],
+    ['*', 0, '#']
+]
+LED_ROW = [6, 20, 19, 13]
+LED_COL = [12, 5, 16]
 
-
-def main():
-    fall_bool = False
-    button_bool = False
-    signal_bool = False
-
-    blink_process = multiprocessing.Process(target=blink_led, args=(30,))
-    instance = dht11.DHT11(pin = 21)
-
-    while True:
-        time_strings = time.strftime("%Y,%m,%d,%H,%M,%S")
-        time_list = time_strings.split(",")
-        time_num = [ int(x) for x in time_list ]
-        
-        dht_result = instance.read()
-
-        if time_num[3] == 12:
-            ## check daily shit at noon
-            pass
-
-        if fall_bool:
-            blink_process.start()
-
-        if signal_bool:
-            blink_process.kill()
-
-        time.sleep(0.5)
-            
 
 def blink_led(duration = 30):
     start_time = time.time()
     GPIO.setwarnings(False)
     GPIO.setup(24, GPIO.OUT)
-
+    
     while time.time() - start_time > duration:
         GPIO.output(24, 1)
-        time.sleep()
+        time.sleep(1)
         GPIO.output(24, 0)
-        time.sleep()
+        time.sleep(1)
+
+
+def buzzer(duration = 30):
+    start_time = time.time()
+    GPIO.setwarnings(False)
+    GPIO.setup(18, GPIO.OUT)
+    
+    while time.time() - start_time > duration:
+        GPIO.output(18, 1)
+        time.sleep(1)
+        GPIO.output(18, 0)
+        time.sleep(1)
+
+
+def accelerometer(old_x, old_y, old_z, acc):
+    new_x,new_y,new_z = acc.get_3_axis_adjusted()
+    if (((new_x - old_x) >= abs(1)) or ((new_y - old_y) >= abs(1)) or (( new_z - old_z) >= abs(1))):
+        return 'bing chilling'
+    print('bing chilling one')
+    time.sleep(0.5)
+    accelerometer(new_x, new_y, new_z, acc)
+
+
+def main():
+    # accel_process = multiprocessing.Process(target = accelerometer, args = (x, y, z, acc))
+    buzzer_process = multiprocessing.Process(target = buzzer, args = (30, ))
+    # accel_process.start()
+    buzzer_process.start()
+    print(buzzer_process.is_alive())
 
 
 if __name__ == "__main__":
+    ADDRESS=0x53
     GPIO.setmode(GPIO.BCM)
-    main()
 
+    acc=adxl345.ADXL345(i2c_port=1,address=ADDRESS)
+    acc.load_calib_value()
+    acc.set_data_rate(data_rate=adxl345.DataRate.R_100)
+    acc.set_range(g_range=adxl345.Range.G_16,full_res=True)
+    acc.measure_start()
+    
+    x,y,z=acc.get_3_axis_adjusted()
+    
+    main()
+    
